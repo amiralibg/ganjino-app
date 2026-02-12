@@ -154,8 +154,6 @@ export default function ProfileScreen() {
   const signOutButtonStyle = useMemo<ViewStyle>(
     () => ({
       margin: theme.spacing.lg,
-      borderColor: theme.colors.error,
-      backgroundColor: theme.colors.error,
       shadowColor: 'transparent',
     }),
     [theme.spacing.lg, theme.colors.error]
