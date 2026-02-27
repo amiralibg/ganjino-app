@@ -122,8 +122,8 @@ The UI includes light and dark theme support, Persian text content, and RTL-awar
 ## Related Projects
 
 - Mobile client: this repository
-- Backend API: `../ganjino-backend`
-- Admin dashboard: `../ganjino-admin`
+- Backend API: [github.com/amiralibg/ganjino-backend](https://github.com/amiralibg/ganjino-backend)
+- Admin dashboard: [github.com/amiralibg/ganjino-admin](https://github.com/amiralibg/ganjino-admin)
 
 ## Contributing
 
