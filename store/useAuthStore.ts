@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi } from '@/lib/api/auth';
 import { authEvents } from '@/lib/authEvents';
+import NetInfo from '@react-native-community/netinfo';
 
 export type User = {
   id: string;
@@ -64,7 +65,15 @@ export const useAuthStore = create<AuthState>((set) => ({
           isAuthenticated: true,
           loading: false,
         });
-      } catch {
+      } catch (validationError: unknown) {
+        if (!(validationError as { response?: unknown })?.response) {
+          const networkState = await NetInfo.fetch();
+          if (networkState.isConnected === false || networkState.isInternetReachable === false) {
+            set({ isAuthenticated: true, loading: false });
+            return;
+          }
+        }
+
         // Token validation failed, try to refresh
         try {
           await authApi.refreshToken(refreshToken);
@@ -75,7 +84,15 @@ export const useAuthStore = create<AuthState>((set) => ({
             isAuthenticated: true,
             loading: false,
           });
-        } catch {
+        } catch (refreshError: unknown) {
+          if (!(refreshError as { response?: unknown })?.response) {
+            const networkState = await NetInfo.fetch();
+            if (networkState.isConnected === false || networkState.isInternetReachable === false) {
+              set({ isAuthenticated: true, loading: false });
+              return;
+            }
+          }
+
           // Refresh failed, clear everything
           await AsyncStorage.removeItem('accessToken');
           await AsyncStorage.removeItem('refreshToken');
@@ -90,7 +107,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 }));
 
 // Listen for auth failures from API client and trigger logout
-authEvents.onAuthFailure(() => {
-  const { signOut } = useAuthStore.getState();
-  void signOut();
-});
+const authListenerFlag = '__ganjino_auth_failure_listener_registered__';
+const globalFlags = globalThis as typeof globalThis & Record<string, boolean | undefined>;
+
+if (!globalFlags[authListenerFlag]) {
+  authEvents.onAuthFailure(() => {
+    const { signOut } = useAuthStore.getState();
+    void signOut();
+  });
+  globalFlags[authListenerFlag] = true;
+}

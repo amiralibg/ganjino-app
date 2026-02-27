@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -8,6 +8,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { showToast } from '@/lib/toast';
 import { TEXT } from '@/constants/text';
 import WalletIcon from '@/components/icons/WalletIcon';
+import { useNetInfo } from '@react-native-community/netinfo';
 
 export default function AuthScreen() {
   const [email, setEmail] = useState('');
@@ -24,6 +25,8 @@ export default function AuthScreen() {
   const setUser = useAuthStore((state) => state.setUser);
   const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
   const { theme } = useTheme();
+  const netInfo = useNetInfo();
+  const isOffline = netInfo.isConnected === false || netInfo.isInternetReachable === false;
 
   const signInMutation = useSignIn();
   const signUpMutation = useSignUp();
@@ -61,7 +64,38 @@ export default function AuthScreen() {
     return emailRegex.test(email);
   };
 
+  useEffect(() => {
+    setErrors({ email: false, password: false, name: false });
+  }, [isSignUp]);
+
+  const resolveApiError = (error: unknown): string => {
+    const responseError = (error as { response?: { data?: unknown } })?.response?.data;
+    if (!responseError) {
+      return TEXT.auth.serverUnavailable;
+    }
+
+    const data = responseError as {
+      error?: string;
+      errors?: Array<{ msg?: string }>;
+    };
+
+    if (data.error) {
+      return data.error;
+    }
+
+    if (data.errors && data.errors.length > 0 && data.errors[0].msg) {
+      return data.errors[0].msg;
+    }
+
+    return TEXT.auth.serverUnavailable;
+  };
+
   const handleAuth = async () => {
+    if (isOffline) {
+      showToast.error(TEXT.common.error, TEXT.auth.offlineMessage);
+      return;
+    }
+
     // Reset errors
     const newErrors = {
       email: false,
@@ -70,7 +104,10 @@ export default function AuthScreen() {
     };
 
     // Validate inputs
-    if (!email || !validateEmail(email)) {
+    const trimmedEmail = email.trim();
+    const trimmedName = name.trim();
+
+    if (!trimmedEmail || !validateEmail(trimmedEmail)) {
       newErrors.email = true;
     }
 
@@ -78,7 +115,7 @@ export default function AuthScreen() {
       newErrors.password = true;
     }
 
-    if (isSignUp && !name) {
+    if (isSignUp && !trimmedName) {
       newErrors.name = true;
     }
 
@@ -87,29 +124,47 @@ export default function AuthScreen() {
 
     // Check if there are any errors
     if (newErrors.email || newErrors.password || newErrors.name) {
-      if (!email || !password || (isSignUp && !name)) {
+      if (!trimmedEmail || !password || (isSignUp && !trimmedName)) {
         showToast.error(TEXT.common.error, TEXT.auth.fillAllFields);
       } else if (newErrors.email) {
         showToast.error(TEXT.common.error, TEXT.auth.invalidEmail);
+      } else if (isSignUp && password.length < 6) {
+        showToast.error(TEXT.common.error, TEXT.auth.passwordTooShort);
+      } else if (isSignUp && trimmedName.length < 2) {
+        showToast.error(TEXT.common.error, TEXT.auth.nameTooShort);
       }
+      return;
+    }
+
+    if (isSignUp && password.length < 6) {
+      showToast.error(TEXT.common.error, TEXT.auth.passwordTooShort);
+      return;
+    }
+
+    if (isSignUp && trimmedName.length < 2) {
+      showToast.error(TEXT.common.error, TEXT.auth.nameTooShort);
       return;
     }
 
     try {
       if (isSignUp) {
-        const result = await signUpMutation.mutateAsync({ email, password, name });
+        const result = await signUpMutation.mutateAsync({
+          email: trimmedEmail.toLowerCase(),
+          password,
+          name: trimmedName,
+        });
         setUser(result.user);
         setAuthenticated(true);
       } else {
-        const result = await signInMutation.mutateAsync({ email, password });
+        const result = await signInMutation.mutateAsync({
+          email: trimmedEmail.toLowerCase(),
+          password,
+        });
         setUser(result.user);
         setAuthenticated(true);
       }
     } catch (error: unknown) {
-      const errorMessage =
-        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        'خطایی رخ داد';
-      showToast.error(TEXT.common.error, errorMessage);
+      showToast.error(TEXT.common.error, resolveApiError(error));
     }
   };
 
@@ -155,6 +210,8 @@ export default function AuthScreen() {
               }
             }}
             autoCapitalize="words"
+            autoCorrect={false}
+            returnKeyType="next"
             placeholderTextColor={theme.colors.textTertiary}
           />
         )}
@@ -170,7 +227,10 @@ export default function AuthScreen() {
             }
           }}
           autoCapitalize="none"
+          autoCorrect={false}
           keyboardType="email-address"
+          textContentType="emailAddress"
+          returnKeyType="next"
           placeholderTextColor={theme.colors.textTertiary}
         />
 
@@ -190,6 +250,11 @@ export default function AuthScreen() {
               }
             }}
             secureTextEntry={!showPassword}
+            textContentType={isSignUp ? 'newPassword' : 'password'}
+            returnKeyType="done"
+            onSubmitEditing={() => {
+              void handleAuth();
+            }}
             placeholderTextColor={theme.colors.textTertiary}
           />
           <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
@@ -206,9 +271,10 @@ export default function AuthScreen() {
             styles.button,
             { backgroundColor: theme.colors.primary },
             loading && styles.buttonDisabled,
+            isOffline && styles.buttonDisabled,
           ]}
           onPress={handleAuth}
-          disabled={loading}
+          disabled={loading || isOffline}
         >
           <Text
             style={[

@@ -4,7 +4,14 @@ import {
   CreateSavingsLogData,
   GetSavingsLogsParams,
   GetAnalyticsParams,
+  SavingsLog,
 } from '../api/savingsLog';
+import { enqueueSavingsLog } from '../savingsQueue';
+
+export interface CreateSavingsLogResult {
+  queued: boolean;
+  savingsLog?: SavingsLog;
+}
 
 // Query keys
 export const savingsLogKeys = {
@@ -41,10 +48,32 @@ export const useCreateSavingsLog = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreateSavingsLogData) => savingsLogApi.create(data),
-    onSuccess: () => {
-      // Invalidate all savings logs and analytics queries
+    mutationFn: async (data: CreateSavingsLogData): Promise<CreateSavingsLogResult> => {
+      try {
+        const savingsLog = await savingsLogApi.create(data);
+        return { queued: false, savingsLog };
+      } catch (error: unknown) {
+        const status = (error as { response?: { status?: number } })?.response?.status;
+        const code = (error as { code?: string })?.code;
+
+        const shouldQueue =
+          !status || code === 'ECONNABORTED' || code === 'ERR_NETWORK' || status >= 500;
+
+        if (shouldQueue) {
+          await enqueueSavingsLog(data);
+          return { queued: true };
+        }
+
+        throw error;
+      }
+    },
+    onSuccess: (result) => {
+      if (result.queued) {
+        return;
+      }
+
       void queryClient.invalidateQueries({ queryKey: savingsLogKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['goals'] });
     },
   });
 };

@@ -11,6 +11,11 @@ export interface SavingsLog {
     price: number;
     goldEquivalent: number;
   };
+  goalAllocations?: Array<{
+    goalId: string;
+    amount: number;
+    allocatedGoldAmount: number;
+  }>;
   note?: string;
   date: string;
   createdAt: string;
@@ -21,6 +26,10 @@ export interface CreateSavingsLogData {
   amount: number;
   type?: 'money' | 'gold';
   goalId?: string;
+  goalAllocations?: Array<{
+    goalId: string;
+    amount: number;
+  }>;
   note?: string;
   date?: string;
 }

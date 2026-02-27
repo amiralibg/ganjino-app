@@ -6,6 +6,9 @@ export interface Profile {
   monthlySalary: number;
   monthlySavingsPercentage: number;
   currency: string;
+  notificationsEnabled: boolean;
+  expoPushToken?: string;
+  goldPriceAlertThreshold?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -14,6 +17,9 @@ export interface UpdateProfileData {
   monthlySalary?: number;
   monthlySavingsPercentage?: number;
   currency?: string;
+  notificationsEnabled?: boolean;
+  expoPushToken?: string;
+  goldPriceAlertThreshold?: number;
 }
 
 export const profileApi = {

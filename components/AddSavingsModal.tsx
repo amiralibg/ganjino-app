@@ -4,10 +4,11 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { DollarSign, Coins, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCreateSavingsLog } from '@/lib/hooks/useSavingsLogs';
+import { useGoals } from '@/lib/hooks/useGoals';
 import { useTheme } from '@/contexts/ThemeContext';
 import { showToast } from '@/lib/toast';
 import { TEXT } from '@/constants/text';
-import { persianToEnglish, englishToPersian } from '@/utils/numbers';
+import { persianToEnglish } from '@/utils/numbers';
 import GlassInput from './ui/GlassInput';
 import DepthButton from './ui/DepthButton';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +20,7 @@ interface AddSavingsModalProps {
 
 export default function AddSavingsModal({ visible, onClose }: AddSavingsModalProps) {
   const createSavingsLog = useCreateSavingsLog();
+  const { data: goals = [] } = useGoals();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -79,21 +81,14 @@ export default function AddSavingsModal({ visible, onClose }: AddSavingsModalPro
   );
 
   const handleAmountChange = (text: string) => {
-    // Convert Persian/Arabic digits to English
-    const converted = persianToEnglish(text);
-
-    // Allow only digits and one decimal point
-    const cleaned = converted.replace(/[^0-9.]/g, '');
-
-    // Handle multiple decimal points - keep only the first one
+    const cleaned = text.replace(/[^0-9.\u06F0-\u06F9\u0660-\u0669]/g, '');
     const parts = cleaned.split('.');
     let final = parts[0];
     if (parts.length > 1) {
       final = parts[0] + '.' + parts.slice(1).join('');
     }
 
-    // Convert back to Persian for display
-    setAmount(final ? englishToPersian(final) : '');
+    setAmount(final);
   };
 
   const handleAddSavings = async () => {
@@ -106,14 +101,18 @@ export default function AddSavingsModal({ visible, onClose }: AddSavingsModalPro
     }
 
     try {
-      await createSavingsLog.mutateAsync({
+      const result = await createSavingsLog.mutateAsync({
         amount: parsedAmount,
         type: selectedType,
         goalId: selectedGoalId,
+        goalAllocations: selectedGoalId ? [{ goalId: selectedGoalId, amount: parsedAmount }] : [],
         note: note || undefined,
       });
 
-      showToast.success(TEXT.common.success, TEXT.history.savingsAdded);
+      showToast.success(
+        TEXT.common.success,
+        result.queued ? TEXT.history.savingsQueued : TEXT.history.savingsAdded
+      );
       resetForm();
       onClose();
     } catch {
@@ -152,6 +151,18 @@ export default function AddSavingsModal({ visible, onClose }: AddSavingsModalPro
       flexDirection: 'row',
       gap: 12,
       marginBottom: 16,
+    },
+    goalChip: {
+      borderRadius: 999,
+      borderWidth: 1,
+      marginBottom: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    goalChipText: {
+      fontFamily: 'Vazirmatn_500Medium',
+      fontSize: 13,
+      textAlign: 'right',
     },
   });
 
@@ -257,6 +268,69 @@ export default function AddSavingsModal({ visible, onClose }: AddSavingsModalPro
               onChangeText={handleAmountChange}
               keyboardType="numeric"
             />
+          </View>
+
+          {/* Goal Allocation */}
+          <View style={styles.inputGroup}>
+            <Text
+              style={[
+                styles.label,
+                {
+                  color: theme.colors.text,
+                  marginBottom: theme.spacing.sm,
+                },
+              ]}
+            >
+              {TEXT.history.goalAllocation}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setSelectedGoalId(undefined)}
+              style={[
+                dynamicStyles.goalChip,
+                {
+                  borderColor: selectedGoalId ? theme.colors.border : theme.colors.primary,
+                  backgroundColor: selectedGoalId ? 'transparent' : theme.colors.primary + '20',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  dynamicStyles.goalChipText,
+                  { color: selectedGoalId ? theme.colors.textSecondary : theme.colors.primary },
+                ]}
+              >
+                {TEXT.history.noGoalAllocation}
+              </Text>
+            </TouchableOpacity>
+            {goals.map((goal) => (
+              <TouchableOpacity
+                key={goal._id}
+                onPress={() => setSelectedGoalId(goal._id)}
+                style={[
+                  dynamicStyles.goalChip,
+                  {
+                    borderColor:
+                      selectedGoalId === goal._id ? theme.colors.primary : theme.colors.border,
+                    backgroundColor:
+                      selectedGoalId === goal._id ? theme.colors.primary + '20' : 'transparent',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    dynamicStyles.goalChipText,
+                    {
+                      color:
+                        selectedGoalId === goal._id
+                          ? theme.colors.primary
+                          : theme.colors.textSecondary,
+                    },
+                  ]}
+                >
+                  {goal.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
           {/* Note Input */}

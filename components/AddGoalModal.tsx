@@ -11,8 +11,9 @@ import { formatGoldWeight } from '@/lib/utils/goldUnits';
 import GlassInput from './ui/GlassInput';
 import DepthButton from './ui/DepthButton';
 import StatCard from './ui/StatCard';
+import ThemedSwitch from './ui/ThemedSwitch';
 import { TEXT, formatNumber, formatDecimal } from '@/constants/text';
-import { persianToEnglish, englishToPersian } from '@/utils/numbers';
+import { persianToEnglish } from '@/utils/numbers';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface AddGoalModalProps {
@@ -29,6 +30,9 @@ export default function AddGoalModal({ visible, onClose, goldPrice }: AddGoalMod
 
   const [goalName, setGoalName] = useState('');
   const [goalPrice, setGoalPrice] = useState('');
+  const [recurringEnabled, setRecurringEnabled] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState<'weekly' | 'monthly'>('monthly');
+  const [recurringDay, setRecurringDay] = useState('1');
 
   // Memoized styles for dynamic theming and RTL support
   const modalContainerStyle = useMemo(
@@ -52,29 +56,18 @@ export default function AddGoalModal({ visible, onClose, goldPrice }: AddGoalMod
   const modalTitleStyle = useMemo(() => ({ color: theme.colors.text }), [theme.colors.text]);
 
   const handlePriceChange = (text: string) => {
-    // Convert Persian/Arabic digits to English digits
-    const converted = persianToEnglish(text);
-
-    // Remove all non-digit characters (keep only English digits)
-    const cleanedText = converted.replace(/[^\d]/g, '');
-
-    if (cleanedText === '') {
+    const cleanedText = text.replace(/[^\d\u06F0-\u06F9\u0660-\u0669]/g, '');
+    if (!cleanedText) {
       setGoalPrice('');
       return;
     }
-
-    // Format with commas (using English format)
-    const formatted = new Intl.NumberFormat('en-US').format(parseInt(cleanedText));
-
-    // Convert to Persian digits for display
-    const persianFormatted = englishToPersian(formatted);
-    setGoalPrice(persianFormatted);
+    setGoalPrice(cleanedText);
   };
 
   const getPriceValue = useCallback((): number => {
     // Convert Persian digits to English, remove commas and parse to number
     const englishPrice = persianToEnglish(goalPrice);
-    const cleanedPrice = englishPrice.replace(/,/g, '');
+    const cleanedPrice = englishPrice.replace(/[^\d]/g, '');
     return parseInt(cleanedPrice) || 0;
   }, [goalPrice]);
 
@@ -157,6 +150,19 @@ export default function AddGoalModal({ visible, onClose, goldPrice }: AddGoalMod
         price,
         isWishlisted: addToWishlist,
         savedGoldAmount: 0,
+        recurringPlan: {
+          enabled: recurringEnabled,
+          frequency: recurringFrequency,
+          dayOfWeek:
+            recurringFrequency === 'weekly'
+              ? Number(persianToEnglish(recurringDay || '0'))
+              : undefined,
+          dayOfMonth:
+            recurringFrequency === 'monthly'
+              ? Number(persianToEnglish(recurringDay || '1'))
+              : undefined,
+          reminderHour: 20,
+        },
       });
 
       // eslint-disable-next-line no-console
@@ -194,6 +200,9 @@ export default function AddGoalModal({ visible, onClose, goldPrice }: AddGoalMod
   const resetForm = () => {
     setGoalName('');
     setGoalPrice('');
+    setRecurringEnabled(false);
+    setRecurringFrequency('monthly');
+    setRecurringDay('1');
   };
 
   const handleClose = () => {
@@ -295,6 +304,53 @@ export default function AddGoalModal({ visible, onClose, goldPrice }: AddGoalMod
             />
           )}
 
+          <View style={styles.recurringRow}>
+            <Text style={[styles.label, { color: theme.colors.text }]}>
+              {TEXT.calculate.recurringPlan}
+            </Text>
+            <ThemedSwitch value={recurringEnabled} onValueChange={setRecurringEnabled} />
+          </View>
+
+          {recurringEnabled && (
+            <>
+              <View style={styles.buttonGroup}>
+                <DepthButton
+                  onPress={() => setRecurringFrequency('monthly')}
+                  variant={recurringFrequency === 'monthly' ? 'primary' : 'outline'}
+                  size="medium"
+                >
+                  {TEXT.calculate.monthlyPlan}
+                </DepthButton>
+                <DepthButton
+                  onPress={() => setRecurringFrequency('weekly')}
+                  variant={recurringFrequency === 'weekly' ? 'primary' : 'outline'}
+                  size="medium"
+                >
+                  {TEXT.calculate.weeklyPlan}
+                </DepthButton>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text
+                  style={[
+                    styles.label,
+                    { color: theme.colors.text, marginBottom: theme.spacing.sm },
+                  ]}
+                >
+                  {recurringFrequency === 'monthly'
+                    ? TEXT.calculate.dayOfMonth
+                    : TEXT.calculate.dayOfWeek}
+                </Text>
+                <GlassInput
+                  placeholder={recurringFrequency === 'monthly' ? '1-28' : '0-6'}
+                  value={recurringDay}
+                  onChangeText={setRecurringDay}
+                  keyboardType="numeric"
+                />
+              </View>
+            </>
+          )}
+
           <View style={styles.buttonGroup}>
             <DepthButton
               onPress={() => handleAddGoal(true)}
@@ -365,5 +421,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontFamily: 'Vazirmatn_700Bold',
     fontSize: 24,
+  },
+  recurringRow: {
+    alignItems: 'center',
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
 });

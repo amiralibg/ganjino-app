@@ -2,8 +2,15 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { authEvents } from '../authEvents';
+import Constants from 'expo-constants';
 
 const getApiUrl = () => {
+  const envApiUrl =
+    process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl || undefined;
+  if (envApiUrl) {
+    return String(envApiUrl);
+  }
+
   if (!__DEV__) {
     return 'https://ganjino-api.amiralibg.xyz/api';
   }
@@ -45,6 +52,16 @@ const processQueue = (error: unknown = null, token: string | null = null) => {
   failedQueue = [];
 };
 
+const shouldSkipRefresh = (url?: string): boolean => {
+  if (!url) return false;
+  return (
+    url.includes('/auth/signin') ||
+    url.includes('/auth/signup') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/logout')
+  );
+};
+
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   async (config) => {
@@ -64,11 +81,16 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+  const requestUrl = originalRequest?.url;
+    if (!originalRequest) {
+      return Promise.reject(error);
+    }
 
     // If error is 401 or 403 (unauthorized/forbidden) and we haven't retried yet
     if (
       (error.response?.status === 401 || error.response?.status === 403) &&
-      !originalRequest._retry
+      !originalRequest._retry &&
+      !shouldSkipRefresh(requestUrl)
     ) {
       if (isRefreshing) {
         // If already refreshing, queue this request

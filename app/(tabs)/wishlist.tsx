@@ -8,7 +8,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { showToast } from '@/lib/toast';
 import { TEXT, formatNumber, formatDecimal } from '@/constants/text';
 import { formatGoldWeight } from '@/lib/utils/goldUnits';
-import { persianToEnglish, englishToPersian } from '@/utils/numbers';
+import { persianToEnglish } from '@/utils/numbers';
 import type { SavingsTimeline } from '@/lib/api/goals';
 import WishlistCard from '@/components/ui/WishlistCard';
 import GlassInput from '@/components/ui/GlassInput';
@@ -64,21 +64,13 @@ export default function WishlistScreen() {
   };
 
   const handleGoldAmountChange = (text: string) => {
-    // Convert Persian/Arabic digits to English
-    const converted = persianToEnglish(text);
-
-    // Allow only digits and one decimal point
-    const cleaned = converted.replace(/[^0-9.]/g, '');
-
-    // Handle multiple decimal points - keep only the first one
+    const cleaned = text.replace(/[^0-9.\u06F0-\u06F9\u0660-\u0669]/g, '');
     const parts = cleaned.split('.');
     let final = parts[0];
     if (parts.length > 1) {
       final = parts[0] + '.' + parts.slice(1).join('');
     }
-
-    // Convert back to Persian for display
-    setGoldAmount(final ? englishToPersian(final) : '');
+    setGoldAmount(final);
   };
 
   const handleAddGold = async (goalId: string, currentAmount: number) => {

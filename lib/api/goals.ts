@@ -25,6 +25,15 @@ export interface Goal {
   currentPriceInToman?: number; // Current total price based on today's gold price
   savedAmountInToman?: number; // Current value of saved gold in Toman
   remainingInToman?: number; // Remaining amount in Toman at current prices
+  recurringPlan?: GoalRecurringPlan;
+}
+
+export interface GoalRecurringPlan {
+  enabled: boolean;
+  frequency: 'weekly' | 'monthly';
+  dayOfWeek?: number;
+  dayOfMonth?: number;
+  reminderHour: number;
 }
 
 export interface CreateGoalData {
@@ -32,6 +41,7 @@ export interface CreateGoalData {
   price: number;
   isWishlisted?: boolean;
   savedGoldAmount?: number;
+  recurringPlan?: GoalRecurringPlan;
 }
 
 export interface UpdateGoalData {
@@ -39,6 +49,7 @@ export interface UpdateGoalData {
   price?: number;
   isWishlisted?: boolean;
   savedGoldAmount?: number;
+  recurringPlan?: GoalRecurringPlan;
 }
 
 export const goalsApi = {

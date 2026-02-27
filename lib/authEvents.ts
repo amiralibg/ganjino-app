@@ -16,6 +16,10 @@ class AuthEvents {
   emitAuthFailure() {
     this.listeners.forEach((listener) => listener());
   }
+
+  hasListeners(): boolean {
+    return this.listeners.length > 0;
+  }
 }
 
 export const authEvents = new AuthEvents();

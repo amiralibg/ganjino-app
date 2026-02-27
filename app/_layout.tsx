@@ -18,6 +18,7 @@ import Toast from 'react-native-toast-message';
 import { toastConfig } from '@/lib/toast';
 import { CustomSplashScreen } from '@/components/CustomSplashScreen';
 import { LogBox } from 'react-native';
+import { useSavingsQueueSync } from '@/lib/hooks/useSavingsQueueSync';
 
 // Keep the splash screen visible while we fetch resources
 void SplashScreen.preventAutoHideAsync();
@@ -29,6 +30,7 @@ LogBox.ignoreLogs([
 
 function RootLayoutContent() {
   useFrameworkReady();
+  useSavingsQueueSync();
   const checkAuth = useAuthStore((state) => state.checkAuth);
   const { theme } = useTheme();
   const [isAppReady, setIsAppReady] = useState(false);
